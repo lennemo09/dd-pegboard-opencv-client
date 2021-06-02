@@ -5,21 +5,32 @@ from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen
 
 import cv2
 
+# GLOBALS
+VIDEO_W, VIDEO_H = (640,480)
+NUM_ROWS, NUM_COLS = 3, 3
+rect_array = [ [QRect(QPoint(), QPoint())]*NUM_COLS for _ in range(NUM_ROWS)]
+
+class Tile:
+    def __init__(self, pos=None, id=None):
+        self.pos = pos
+        self.id = id
+        self.selected = False
+
+
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         """Initializer."""
         super().__init__(parent)
         self.setWindowTitle("DD Interactive Pegboard")
-        self.window_width, self.window_height = 1200,800
-        self.setMinimumSize(self.window_width,self.window_height)
-
         self.window = QWidget()
         self.layout = QVBoxLayout()
+        self.layout.addStretch(1)
         self.setCentralWidget(self.window)
         self.window.setLayout(self.layout)
-
-        self.feed_label = QLabel()
-        self.layout.addWidget(self.feed_label)
+        
+        self.feed_label = QLabel()  # Video feed component stored in a label
+        self.feed_label.setScaledContents = True
+        self.layout.addWidget(self.feed_label,0)
 
         self.thread_worker = ThreadWorker()
         self.thread_worker.start()
@@ -29,19 +40,25 @@ class MainWindow(QMainWindow):
         self.imageViewApp.setMainWindow(self)
         #self.layout.addWidget(self.imageViewApp)
 
-        self.update_button = QPushButton("Update")
-        self.layout.addWidget(self.update_button)
+        # self.update_button = QPushButton("Update")
+        # self.layout.addWidget(self.update_button,0)
 
-        self.stop_button = QPushButton("Stop")
-        self.layout.addWidget(self.stop_button)
-        self.stop_button.clicked.connect(self._stopVideoFeed)
+        #self.update_button = QPushButton("Next")
+        #self.layout.addWidget(,0)
+        # self.stop_button = QPushButton("Stop")
+        # self.layout.addWidget(self.stop_button,0)
+        # self.stop_button.clicked.connect(self._stopVideoFeed)
+
+        self.selected_row = 0
+        self.selected_col = 0
 
         menuBar = QMenuBar(self)
         self.setMenuBar(menuBar)
         self._createMenuBar()
         self._createToolBars()
         self._createStatusBar()
-    
+        #self.setFixedSize(self.size())
+
     def _createMenuBar(self):
         menuBar = self.menuBar()
 
@@ -54,12 +71,10 @@ class MainWindow(QMainWindow):
     
     def _createStatusBar(self):
         self.statusbar = self.statusBar()
-        # Adding a temporary message
         self.statusbar.showMessage("Ready", 3000)
 
     def _writeToStatusBar(self, message : str, time=3000):
-        self.statusbar = self.statusBar()
-        # Adding a temporary message
+        self.statusbar = self.statusBar()        
         self.statusbar.showMessage(message, time)
 
     def _imageUpdateSlot(self, pic):
@@ -68,12 +83,19 @@ class MainWindow(QMainWindow):
     def _stopVideoFeed(self):
         self.thread_worker.stop()
 
+    def _nextRow(self):
+        self.selected_row += 1
+    
+    def _nextRow(self):
+        self.selected_row += 1
+
+
 class ThreadWorker(QThread):
     thread_image_update = pyqtSignal(QImage)
 
     def run(self):
         self.active_thread = True
-        cv2_video_capture = cv2.VideoCapture(0)
+        cv2_video_capture = cv2.VideoCapture(0) # Camera ID, in-built webcam is 0
 
         while self.active_thread:
             ret, frame = cv2_video_capture.read()
@@ -81,7 +103,7 @@ class ThreadWorker(QThread):
                 cv2_rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 cv2_flipped_rgb_image = cv2.flip(cv2_rgb_image, 1)
                 image_in_Qt_format = QImage(cv2_flipped_rgb_image.data, cv2_flipped_rgb_image.shape[1], cv2_flipped_rgb_image.shape[0], QImage.Format_RGB888)
-                pic = image_in_Qt_format.scaled(640, 480, Qt.KeepAspectRatio)
+                pic = image_in_Qt_format.scaled(VIDEO_W, VIDEO_H, Qt.KeepAspectRatio)
                 self.thread_image_update.emit(pic)
     
     def stop(self):
@@ -94,10 +116,10 @@ class ImageViewApp(QWidget):
         super(ImageViewApp,self).__init__(parent)
         self.main_window = None
         
-        #layout = QVBoxLayout()
-        #self.setLayout(layout)
-
-        self.window_width, self.window_height = 1200,800
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+        
+        self.window_width, self.window_height = VIDEO_W,VIDEO_H
         self.setMinimumSize(self.window_width,self.window_height)
 
         self.pix = QPixmap(self.rect().size())
@@ -107,16 +129,13 @@ class ImageViewApp(QWidget):
 
         self.rect_start, self.rect_end = QPoint(), QPoint()
 
-        self.selected_tile = (0,0)
-        self.rect_dict = {}
-
     def setMainWindow(self, main_window : MainWindow):
         self.main_window = main_window
     
     def setSelectedTile(self,x=0,y=0):
         self.selected_tile = (x,y)
     
-    def configPen(self, color=Qt.red, width=5, join_style=Qt.MiterJoin):
+    def configPen(self, color=Qt.red, width=2, join_style=Qt.MiterJoin):
         self.pen.setColor(color)
         self.pen.setWidth(width)
         self.pen.setJoinStyle(join_style)
@@ -131,25 +150,42 @@ class ImageViewApp(QWidget):
         if not self.rect_start.isNull() and not self.rect_end.isNull():
             rect = QRect(self.rect_start, self.rect_end)
             painter.drawRect(rect.normalized())
+        
+        painter.setPen(self.pen)
+        for row in rect_array:
+            for tile_rect in row:
+                painter.drawRect(tile_rect.normalized())
+        painter.setPen(QPen())
+        #print(rect_array)
 
     def mousePressEvent(self, event):
         #print("Mouse press")
         if event.buttons() & Qt.LeftButton:
+            self.rect_start, self.rect_end = QPoint(), QPoint()
             self.rect_start = event.pos()
             self.rect_end = self.rect_start
             self.update()
     
     def mouseReleaseEvent(self, event):
         #print("Mouse release")
-        if event.button() & Qt.LeftButton:
-            rect = QRect(self.rect_start, self.rect_end)
-            print(f"rect start {self.rect_start.x()},{self.rect_start.y()}")
-            print(f"rect end {self.rect_end.x()},{self.rect_end.y()}")
+        if (selected_row is not None) and (selected_col is not None) and (event.button() & Qt.LeftButton):
+            if rect_array[selected_row][selected_col] is not None:
+                new_rect = rect_array[selected_row][selected_col]
+                rect_array[selected_row][selected_col].setCoords(self.rect_start.x(),self.rect_start.y(),self.rect_end.x(),self.rect_end.y())
+            else:
+                new_rect = QRect(self.rect_start, self.rect_end)
+                rect_array[selected_row][selected_col] = new_rect
+            #print(f"rect start {self.rect_start.x()},{self.rect_start.y()}")
+            #print(f"rect end {self.rect_end.x()},{self.rect_end.y()}")
 
-            painter = QPainter(self.pix)
-            painter.setPen(self.pen)
-            painter.drawRect(rect.normalized())
+            # painter = QPainter(self.pix)
+            # painter.setPen(self.pen)
+            # painter.drawRect(new_rect.normalized())
 
+            self.rect_start, self.rect_end = QPoint(), QPoint()
+            self.update()
+        
+        else:
             self.rect_start, self.rect_end = QPoint(), QPoint()
             self.update()
 
