@@ -8,8 +8,9 @@ import cv2
 # GLOBALS
 VIDEO_W, VIDEO_H = (640,480)
 NUM_ROWS, NUM_COLS = 3, 3
-rect_array = [ [QRect(QPoint(), QPoint())]*NUM_COLS for _ in range(NUM_ROWS)]
-
+selected_row : int = 1
+selected_col : int = 1
+rect_array = [ [None]*NUM_COLS for _ in range(NUM_ROWS)]
 class Tile:
     def __init__(self, pos=None, id=None):
         self.pos = pos
@@ -27,7 +28,7 @@ class MainWindow(QMainWindow):
         self.layout.addStretch(1)
         self.setCentralWidget(self.window)
         self.window.setLayout(self.layout)
-        
+
         self.feed_label = QLabel()  # Video feed component stored in a label
         self.feed_label.setScaledContents = True
         self.layout.addWidget(self.feed_label,0)
@@ -43,14 +44,9 @@ class MainWindow(QMainWindow):
         # self.update_button = QPushButton("Update")
         # self.layout.addWidget(self.update_button,0)
 
-        #self.update_button = QPushButton("Next")
-        #self.layout.addWidget(,0)
         # self.stop_button = QPushButton("Stop")
         # self.layout.addWidget(self.stop_button,0)
         # self.stop_button.clicked.connect(self._stopVideoFeed)
-
-        self.selected_row = 0
-        self.selected_col = 0
 
         menuBar = QMenuBar(self)
         self.setMenuBar(menuBar)
@@ -83,19 +79,12 @@ class MainWindow(QMainWindow):
     def _stopVideoFeed(self):
         self.thread_worker.stop()
 
-    def _nextRow(self):
-        self.selected_row += 1
-    
-    def _nextRow(self):
-        self.selected_row += 1
-
-
 class ThreadWorker(QThread):
     thread_image_update = pyqtSignal(QImage)
 
     def run(self):
         self.active_thread = True
-        cv2_video_capture = cv2.VideoCapture(0) # Camera ID, in-built webcam is 0
+        cv2_video_capture = cv2.VideoCapture(1) # Camera ID, in-built webcam is 1
 
         while self.active_thread:
             ret, frame = cv2_video_capture.read()
@@ -118,7 +107,7 @@ class ImageViewApp(QWidget):
         
         layout = QVBoxLayout()
         self.setLayout(layout)
-        
+
         self.window_width, self.window_height = VIDEO_W,VIDEO_H
         self.setMinimumSize(self.window_width,self.window_height)
 
@@ -154,9 +143,10 @@ class ImageViewApp(QWidget):
         painter.setPen(self.pen)
         for row in rect_array:
             for tile_rect in row:
-                painter.drawRect(tile_rect.normalized())
+                if tile_rect is not None:
+                    painter.drawRect(tile_rect.normalized())
         painter.setPen(QPen())
-        #print(rect_array)
+        print(rect_array)
 
     def mousePressEvent(self, event):
         #print("Mouse press")
