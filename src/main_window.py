@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QGridLayout, QLabel, QMainWindow, QPushButton, QWidget, QToolBar, QVBoxLayout, QMenu, QMenuBar
+from PyQt5.QtWidgets import QApplication, QGridLayout, QHBoxLayout, QLabel, QMainWindow, QPushButton, QWidget, QToolBar, QVBoxLayout, QMenu, QMenuBar
 from PyQt5.QtCore import QThread, Qt, QPoint, QRect, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen
 
@@ -14,7 +14,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(self.window_width,self.window_height)
 
         self.window = QWidget()
-        self.layout = QGridLayout()
+        self.layout = QVBoxLayout()
         self.setCentralWidget(self.window)
         self.window.setLayout(self.layout)
 
@@ -25,9 +25,9 @@ class MainWindow(QMainWindow):
         self.thread_worker.start()
         self.thread_worker.thread_image_update.connect(self._imageUpdateSlot)
 
-        self.imageViewApp = ImageViewApp()
+        self.imageViewApp = ImageViewApp(self.feed_label)
         self.imageViewApp.setMainWindow(self)
-        self.layout.addWidget(self.imageViewApp)
+        #self.layout.addWidget(self.imageViewApp)
 
         self.update_button = QPushButton("Update")
         self.layout.addWidget(self.update_button)
@@ -88,27 +88,14 @@ class ThreadWorker(QThread):
         self.active_thread = False
         self.quit()
 
-# class VideoStreamApp(QWidget):
-#     def __init__(self,parent):
-#         super(VideoStreamApp, self).__init__(parent)
-
-#         self.layout = QtGui.QFormLayout(self)
-
-#         self.startButton = QtGui.QPushButton('Start', parent)
-#         self.startButton.clicked.connect(parent.startCapture)
-#         self.startButton.setFixedWidth(50)
-#         self.pauseButton = QtGui.QPushButton('Pause', parent)
-#         self.pauseButton.setFixedWidth(50)
-#         self.layout.addRow(self.startButton, self.pauseButton)
-
 
 class ImageViewApp(QWidget):
     def __init__(self, parent=None):
         super(ImageViewApp,self).__init__(parent)
         self.main_window = None
         
-        layout = QVBoxLayout()
-        self.setLayout(layout)
+        #layout = QVBoxLayout()
+        #self.setLayout(layout)
 
         self.window_width, self.window_height = 1200,800
         self.setMinimumSize(self.window_width,self.window_height)
