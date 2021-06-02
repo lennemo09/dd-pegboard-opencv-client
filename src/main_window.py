@@ -8,9 +8,11 @@ import cv2
 # GLOBALS
 VIDEO_W, VIDEO_H = (640,480)
 NUM_ROWS, NUM_COLS = 3, 3
-selected_row : int = 1
-selected_col : int = 1
+
+selected_row = 1
+selected_col = 1
 rect_array = [ [None]*NUM_COLS for _ in range(NUM_ROWS)]
+
 class Tile:
     def __init__(self, pos=None, id=None):
         self.pos = pos
@@ -41,8 +43,9 @@ class MainWindow(QMainWindow):
         self.imageViewApp.setMainWindow(self)
         #self.layout.addWidget(self.imageViewApp)
 
-        # self.update_button = QPushButton("Update")
-        # self.layout.addWidget(self.update_button,0)
+        self.update_button = QPushButton("Update")
+        self.layout.addWidget(self.update_button,0)
+        self.update_button.clicked.connect(self._incrementRow)
 
         # self.stop_button = QPushButton("Stop")
         # self.layout.addWidget(self.stop_button,0)
@@ -78,6 +81,14 @@ class MainWindow(QMainWindow):
 
     def _stopVideoFeed(self):
         self.thread_worker.stop()
+
+    def _incrementRow(self):
+        global selected_row
+        selected_row = (selected_row + 1) % NUM_ROWS
+    
+    def _incrementCol(self):
+        global selected_col
+        selected_col = (selected_col + 1) % NUM_ROWS
 
 class ThreadWorker(QThread):
     thread_image_update = pyqtSignal(QImage)
