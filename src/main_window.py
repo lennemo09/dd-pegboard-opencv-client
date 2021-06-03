@@ -9,15 +9,14 @@ import cv2
 VIDEO_W, VIDEO_H = (1280,720)
 NUM_ROWS, NUM_COLS = 22, 41 # Pegboard is 22 x 41
 
-selected_row = 0
-selected_col = 0
+selected_row = None
+selected_col = None
 rect_array = [ [None]*NUM_COLS for _ in range(NUM_ROWS) ]
 
-class Tile:
-    def __init__(self, pos=None, id=None):
+class Tile(QCheckBox):
+    def __init__(self, pos):
+        QCheckBox.__init__(self)
         self.pos = pos
-        self.id = id
-        self.selected = False
 
 
 class MainWindow(QMainWindow):
@@ -90,12 +89,16 @@ class MainWindow(QMainWindow):
         self.grid_layout_widget = QWidget()
         self.split_layout.addWidget(self.grid_layout_widget)
         self.grid_layout = QGridLayout()
-        #self.grid_layout.setSpacing(0)
+        self.grid_layout.setHorizontalSpacing(1)
+        self.grid_layout.setVerticalSpacing(0)
         self.grid_layout_widget.setLayout(self.grid_layout)
 
         for i in range(NUM_ROWS):
             for j in range(NUM_COLS):
-                self.grid_layout.addWidget(QCheckBox(),i,j)
+                tile = Tile((i,j))
+                tile.stateChanged.connect(self._tileClicked)
+                self.grid_layout.addWidget(tile,i,j)
+                
 
     def _createMenuBar(self):
         menuBar = self.menuBar()
@@ -131,6 +134,9 @@ class MainWindow(QMainWindow):
             else:
                 selected_row = (new_row) % NUM_ROWS
                 self.row_select_field.setText(str(selected_row))
+                self.grid_layout.itemAtPosition(old_row_select,selected_col).widget().setChecked(False)
+                self.grid_layout.itemAtPosition(selected_row,selected_col).widget().setChecked(True)
+            # TODO Update corresponding check boxes
         except:
             self.row_select_field.setText(str(old_row_select))
         print(f"Selected row: {selected_row}")
@@ -145,6 +151,10 @@ class MainWindow(QMainWindow):
             else:
                 selected_col = (new_col) % NUM_ROWS
                 self.col_select_field.setText(str(selected_col))
+                self.grid_layout.itemAtPosition(selected_row,old_col_select).widget().setChecked(False)
+                self.grid_layout.itemAtPosition(selected_row,selected_col).widget().setChecked(True)
+            
+            # TODO Update corresponding check boxes
         except:
             self.col_select_field.setText(str(old_col_select))
         print(f"Selected col: {selected_col}")
@@ -153,11 +163,36 @@ class MainWindow(QMainWindow):
         global selected_row
         selected_row = (selected_row + 1) % NUM_ROWS
         self.row_select_field.setText(str(selected_row))
+        # TODO Update corresponding check boxes
     
     def _incrementCol(self):
         global selected_col
         selected_col = (selected_col + 1) % NUM_ROWS
         self.col_select_field.setText(str(selected_col))
+        # TODO Update corresponding check boxes
+
+    def _tileClicked(self):
+        tile = self.sender()
+        row,col = tile.pos
+        if tile.isChecked():
+            self.row_select_field.setText(str(row))
+            self.col_select_field.setText(str(col))
+            
+            global selected_row
+            global selected_col
+            old_row_select = selected_row
+            old_col_select = selected_col
+            selected_row = row
+            selected_col = col
+            # TODO: Deselect all other check boxes
+            print(f"Checked {row},{col}")
+            if (old_row_select is not None) and (old_col_select is not None):
+                self.grid_layout.itemAtPosition(old_row_select,old_col_select).widget().setChecked(False)
+        elif (row == selected_row) and (col == selected_col):
+            pass
+        else:
+            # TODO: Checks if no other boxes are checked
+            print(f"Unchecked {row},{col}")
 
 class ThreadWorker(QThread):
     thread_image_update = pyqtSignal(QImage)
@@ -248,12 +283,6 @@ class ImageViewApp(QWidget):
             else:
                 new_rect = QRect(self.rect_start, self.rect_end)
                 rect_array[selected_row][selected_col] = new_rect
-            #print(f"rect start {self.rect_start.x()},{self.rect_start.y()}")
-            #print(f"rect end {self.rect_end.x()},{self.rect_end.y()}")
-
-            # painter = QPainter(self.pix)
-            # painter.setPen(self.pen)
-            # painter.drawRect(new_rect.normalized())
 
             self.rect_start, self.rect_end = QPoint(), QPoint()
             self.update()
