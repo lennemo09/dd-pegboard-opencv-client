@@ -7,11 +7,11 @@ import cv2
 
 # GLOBALS
 VIDEO_W, VIDEO_H = (640,480)
-NUM_ROWS, NUM_COLS = 30, 40
+NUM_ROWS, NUM_COLS = 22, 41 # Pegboard is 22 x 41
 
 selected_row = 0
 selected_col = 0
-rect_array = [ [None]*NUM_COLS for _ in range(NUM_ROWS)]
+rect_array = [ [None]*NUM_COLS for _ in range(NUM_ROWS) ]
 
 class Tile:
     def __init__(self, pos=None, id=None):
@@ -195,9 +195,12 @@ class ImageViewApp(QWidget):
             painter.drawRect(rect.normalized())
         
         painter.setPen(self.pen)
-        for row in rect_array:
-            for tile_rect in row:
+        for i in range(len(rect_array)):
+            row = rect_array[i]
+            for j in range(len(row)):
+                tile_rect = row[j]
                 if tile_rect is not None:
+                    painter.drawText(tile_rect.left(), tile_rect.top()-3, f"({i},{j})")
                     painter.drawRect(tile_rect.normalized())
         painter.setPen(QPen())
         #print(rect_array)
