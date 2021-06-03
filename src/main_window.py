@@ -1,12 +1,12 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QPushButton, QWidget, QToolBar, QVBoxLayout, QMenu, QMenuBar
+from PyQt5.QtWidgets import QApplication, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QPushButton, QWidget, QToolBar, QVBoxLayout, QMenu, QMenuBar, QCheckBox
 from PyQt5.QtCore import QThread, Qt, QPoint, QRect, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen, QIntValidator
 
 import cv2
 
 # GLOBALS
-VIDEO_W, VIDEO_H = (640,480)
+VIDEO_W, VIDEO_H = (1280,720)
 NUM_ROWS, NUM_COLS = 22, 41 # Pegboard is 22 x 41
 
 selected_row = 0
@@ -26,10 +26,15 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.setWindowTitle("DD Interactive Pegboard")
         self.window = QWidget()
-        self.layout = QVBoxLayout()
-        self.layout.addStretch(1)
+
+        self.layout_main = QVBoxLayout()
+        self.layout_widget = QWidget()
+        self.layout_main.addWidget(self.layout_widget)
+        self.split_layout = QHBoxLayout()
+        self.layout_widget.setLayout(self.split_layout)
+        
         self.setCentralWidget(self.window)
-        self.window.setLayout(self.layout)
+        self.window.setLayout(self.layout_main)
 
         menuBar = QMenuBar(self)
         self.setMenuBar(menuBar)
@@ -39,7 +44,8 @@ class MainWindow(QMainWindow):
 
         self.feed_label = QLabel()  # Video feed component stored in a label
         self.feed_label.setScaledContents = True
-        self.layout.addWidget(self.feed_label,0)
+        self.split_layout.addWidget(self.feed_label,0)
+        self.layout_main.addStretch(1)
 
         self.thread_worker = ThreadWorker()
         self.thread_worker.start()
@@ -55,6 +61,7 @@ class MainWindow(QMainWindow):
 
         self.row_select_field = QLineEdit(str(selected_row))
         #self.row_select_field.setValidator(QIntValidator(0,NUM_ROWS,self))
+        self.row_select_field.setFixedWidth(80)
         self.row_select_field.editingFinished.connect(self._rowSelectionEnterPressed)
         self.editToolBar.addWidget(self.row_select_field)
 
@@ -66,6 +73,7 @@ class MainWindow(QMainWindow):
 
         self.col_select_field = QLineEdit(str(selected_col))
         #self.col_select_field.setValidator(QIntValidator(0,NUM_COLS,self))
+        self.col_select_field.setFixedWidth(80)
         self.col_select_field.editingFinished.connect(self._colSelectionEnterPressed)
         self.editToolBar.addWidget(self.col_select_field)
 
@@ -78,6 +86,16 @@ class MainWindow(QMainWindow):
         self.next_col_button = QPushButton("Next Column")
         self.editToolBar.addWidget(self.next_col_button)
         self.next_col_button.clicked.connect(self._incrementCol)
+
+        self.grid_layout_widget = QWidget()
+        self.split_layout.addWidget(self.grid_layout_widget)
+        self.grid_layout = QGridLayout()
+        #self.grid_layout.setSpacing(0)
+        self.grid_layout_widget.setLayout(self.grid_layout)
+
+        for i in range(NUM_ROWS):
+            for j in range(NUM_COLS):
+                self.grid_layout.addWidget(QCheckBox(),i,j)
 
     def _createMenuBar(self):
         menuBar = self.menuBar()
@@ -146,7 +164,7 @@ class ThreadWorker(QThread):
 
     def run(self):
         self.active_thread = True
-        cv2_video_capture = cv2.VideoCapture(1) # Camera ID, in-built webcam is 1
+        cv2_video_capture = cv2.VideoCapture(0) # Camera ID, in-built webcam is 1
 
         while self.active_thread:
             ret, frame = cv2_video_capture.read()
@@ -260,6 +278,17 @@ if __name__ == "__main__":
     qt_app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
+
+    qt_app.setStyleSheet('''
+        QCheckBox {
+            spacing: 0px;
+        }
+
+        QCheckBox::indicator {
+            width: 20px;
+            height: 20px;
+        }
+    ''')
 
     try:
         sys.exit(qt_app.exec_())
