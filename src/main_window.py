@@ -128,10 +128,12 @@ class MainWindow(QMainWindow):
     def _incrementRow(self):
         global selected_row
         selected_row = (selected_row + 1) % NUM_ROWS
+        self.row_select_field.setText(str(selected_row))
     
     def _incrementCol(self):
         global selected_col
         selected_col = (selected_col + 1) % NUM_ROWS
+        self.col_select_field.setText(str(selected_col))
 
 class ThreadWorker(QThread):
     thread_image_update = pyqtSignal(QImage)
@@ -242,6 +244,10 @@ class ImageViewApp(QWidget):
             self.rect_end = event.pos()
             if self.main_window: self.main_window._writeToStatusBar(f"Cursor position: ({self.rect_end.x()},{self.rect_end.y()})")
             self.update()
+
+
+def get_rectangle_coordinates():
+    pass
 
 
 if __name__ == "__main__":
