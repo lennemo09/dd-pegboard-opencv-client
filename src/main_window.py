@@ -49,16 +49,28 @@ class MainWindow(QMainWindow):
         self.imageViewApp.setMainWindow(self)
         #self.layout.addWidget(self.imageViewApp)
 
+        self.selected_row_label = QLabel()
+        self.selected_row_label.setText("Selected row:")
+        self.editToolBar.addWidget(self.selected_row_label)
+
         self.row_select_field = QLineEdit(str(selected_row))
         #self.row_select_field.setValidator(QIntValidator(0,NUM_ROWS,self))
         self.row_select_field.editingFinished.connect(self._rowSelectionEnterPressed)
         self.editToolBar.addWidget(self.row_select_field)
+
+        self.editToolBar.addSeparator()
+
+        self.selected_col_label = QLabel()
+        self.selected_col_label.setText("Selected column:")
+        self.editToolBar.addWidget(self.selected_col_label)
 
         self.col_select_field = QLineEdit(str(selected_col))
         #self.col_select_field.setValidator(QIntValidator(0,NUM_COLS,self))
         self.col_select_field.editingFinished.connect(self._colSelectionEnterPressed)
         self.editToolBar.addWidget(self.col_select_field)
 
+        self.editToolBar.addSeparator()
+        
         self.next_row_button = QPushButton("Next Row")
         self.editToolBar.addWidget(self.next_row_button)
         self.next_row_button.clicked.connect(self._incrementRow)
@@ -66,12 +78,6 @@ class MainWindow(QMainWindow):
         self.next_col_button = QPushButton("Next Column")
         self.editToolBar.addWidget(self.next_col_button)
         self.next_col_button.clicked.connect(self._incrementCol)
-
-        # self.stop_button = QPushButton("Stop")
-        # self.layout.addWidget(self.stop_button,0)
-        # self.stop_button.clicked.connect(self._stopVideoFeed)
-
-        #self.setFixedSize(self.size())
 
     def _createMenuBar(self):
         menuBar = self.menuBar()
