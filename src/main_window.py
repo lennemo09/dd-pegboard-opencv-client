@@ -1,16 +1,16 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QGridLayout, QHBoxLayout, QLabel, QMainWindow, QPushButton, QWidget, QToolBar, QVBoxLayout, QMenu, QMenuBar
+from PyQt5.QtWidgets import QApplication, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QPushButton, QWidget, QToolBar, QVBoxLayout, QMenu, QMenuBar
 from PyQt5.QtCore import QThread, Qt, QPoint, QRect, pyqtSignal
-from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen
+from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen, QIntValidator
 
 import cv2
 
 # GLOBALS
 VIDEO_W, VIDEO_H = (640,480)
-NUM_ROWS, NUM_COLS = 3, 3
+NUM_ROWS, NUM_COLS = 30, 40
 
-selected_row = 1
-selected_col = 1
+selected_row = 0
+selected_col = 0
 rect_array = [ [None]*NUM_COLS for _ in range(NUM_ROWS)]
 
 class Tile:
@@ -31,6 +31,12 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.window)
         self.window.setLayout(self.layout)
 
+        menuBar = QMenuBar(self)
+        self.setMenuBar(menuBar)
+        self._createMenuBar()
+        self._createToolBars()
+        self._createStatusBar()
+
         self.feed_label = QLabel()  # Video feed component stored in a label
         self.feed_label.setScaledContents = True
         self.layout.addWidget(self.feed_label,0)
@@ -43,19 +49,28 @@ class MainWindow(QMainWindow):
         self.imageViewApp.setMainWindow(self)
         #self.layout.addWidget(self.imageViewApp)
 
-        self.update_button = QPushButton("Update")
-        self.layout.addWidget(self.update_button,0)
-        self.update_button.clicked.connect(self._incrementRow)
+        self.row_select_field = QLineEdit(str(selected_row))
+        #self.row_select_field.setValidator(QIntValidator(0,NUM_ROWS,self))
+        self.row_select_field.editingFinished.connect(self._rowSelectionEnterPressed)
+        self.editToolBar.addWidget(self.row_select_field)
+
+        self.col_select_field = QLineEdit(str(selected_col))
+        #self.col_select_field.setValidator(QIntValidator(0,NUM_COLS,self))
+        self.col_select_field.editingFinished.connect(self._colSelectionEnterPressed)
+        self.editToolBar.addWidget(self.col_select_field)
+
+        self.next_row_button = QPushButton("Next Row")
+        self.editToolBar.addWidget(self.next_row_button)
+        self.next_row_button.clicked.connect(self._incrementRow)
+
+        self.next_col_button = QPushButton("Next Column")
+        self.editToolBar.addWidget(self.next_col_button)
+        self.next_col_button.clicked.connect(self._incrementCol)
 
         # self.stop_button = QPushButton("Stop")
         # self.layout.addWidget(self.stop_button,0)
         # self.stop_button.clicked.connect(self._stopVideoFeed)
 
-        menuBar = QMenuBar(self)
-        self.setMenuBar(menuBar)
-        self._createMenuBar()
-        self._createToolBars()
-        self._createStatusBar()
         #self.setFixedSize(self.size())
 
     def _createMenuBar(self):
@@ -65,8 +80,8 @@ class MainWindow(QMainWindow):
         menuBar.addMenu(fileMenu)
 
     def _createToolBars(self):
-        editToolBar = QToolBar("Edit", self)
-        self.addToolBar(editToolBar)
+        self.editToolBar = QToolBar("Edit", self)
+        self.addToolBar(self.editToolBar)
     
     def _createStatusBar(self):
         self.statusbar = self.statusBar()
@@ -81,6 +96,34 @@ class MainWindow(QMainWindow):
 
     def _stopVideoFeed(self):
         self.thread_worker.stop()
+
+    def _rowSelectionEnterPressed(self):
+        global selected_row
+        old_row_select = selected_row
+        try:
+            new_row = int(self.row_select_field.text())
+            if new_row < 0:
+                self.row_select_field.setText(str(old_row_select))
+            else:
+                selected_row = (new_row) % NUM_ROWS
+                self.row_select_field.setText(str(selected_row))
+        except:
+            self.row_select_field.setText(str(old_row_select))
+        print(f"Selected row: {selected_row}")
+
+    def _colSelectionEnterPressed(self):
+        global selected_col
+        old_col_select = selected_col
+        try:
+            new_col = int(self.col_select_field.text())
+            if new_col < 0:
+                self.col_select_field.setText(str(old_col_select))
+            else:
+                selected_col = (new_col) % NUM_ROWS
+                self.col_select_field.setText(str(selected_col))
+        except:
+            self.col_select_field.setText(str(old_col_select))
+        print(f"Selected col: {selected_col}")
 
     def _incrementRow(self):
         global selected_row
@@ -157,7 +200,7 @@ class ImageViewApp(QWidget):
                 if tile_rect is not None:
                     painter.drawRect(tile_rect.normalized())
         painter.setPen(QPen())
-        print(rect_array)
+        #print(rect_array)
 
     def mousePressEvent(self, event):
         #print("Mouse press")
