@@ -2,21 +2,36 @@ import sys
 from PyQt5.QtWidgets import QApplication, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QPushButton, QWidget, QToolBar, QVBoxLayout, QMenu, QMenuBar, QCheckBox
 from PyQt5.QtCore import QThread, Qt, QPoint, QRect, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen, QIntValidator
+import numpy as np
+
+from peg_check import checkIntensity
 
 import cv2
 
 # GLOBALS
-VIDEO_W, VIDEO_H = (1280,720)
+VIDEO_W, VIDEO_H = (800,600)
 NUM_ROWS, NUM_COLS = 22, 41 # Pegboard is 22 x 41
+CAMERA_ID = 0
+INTENSITY_THRESHOLD = 0.3
+cv2_video_capture = None
+last_frame = None
 
 selected_row = None
 selected_col = None
 rect_array = [ [None]*NUM_COLS for _ in range(NUM_ROWS) ]
 
+class PegTile():
+    def __init__(self):
+        self.coords = None
+        self.has_peg = False
+
+tile_array = [ [PegTile()]*NUM_COLS for _ in range(NUM_ROWS) ]
+
 class Tile(QCheckBox):
     def __init__(self, pos):
         QCheckBox.__init__(self)
         self.pos = pos
+        self.has_peg = False
 
 
 class MainWindow(QMainWindow):
@@ -46,9 +61,13 @@ class MainWindow(QMainWindow):
         self.split_layout.addWidget(self.feed_label,0)
         self.layout_main.addStretch(1)
 
-        self.thread_worker = ThreadWorker()
-        self.thread_worker.start()
-        self.thread_worker.thread_image_update.connect(self._imageUpdateSlot)
+        self.camera_thread_worker = CameraThreadWorker()
+        self.camera_thread_worker.start()
+        self.camera_thread_worker.thread_image_update.connect(self._imageUpdateSlot)
+
+        self.peg_check_thread_worker = PegCheckThreadWorker()
+        self.peg_check_thread_worker.start()
+        self.camera_thread_worker.thread_last_frame_update.connect(self._lastFrameUpdateSlot)
 
         self.imageViewApp = ImageViewApp(self.feed_label)
         self.imageViewApp.setMainWindow(self)
@@ -64,6 +83,10 @@ class MainWindow(QMainWindow):
         self.row_select_field.editingFinished.connect(self._rowSelectionEnterPressed)
         self.editToolBar.addWidget(self.row_select_field)
 
+        self.next_row_button = QPushButton("Next Row")
+        self.editToolBar.addWidget(self.next_row_button)
+        self.next_row_button.clicked.connect(self._incrementRow)
+
         self.editToolBar.addSeparator()
 
         self.selected_col_label = QLabel()
@@ -76,28 +99,24 @@ class MainWindow(QMainWindow):
         self.col_select_field.editingFinished.connect(self._colSelectionEnterPressed)
         self.editToolBar.addWidget(self.col_select_field)
 
-        self.editToolBar.addSeparator()
-        
-        self.next_row_button = QPushButton("Next Row")
-        self.editToolBar.addWidget(self.next_row_button)
-        self.next_row_button.clicked.connect(self._incrementRow)
-
         self.next_col_button = QPushButton("Next Column")
         self.editToolBar.addWidget(self.next_col_button)
         self.next_col_button.clicked.connect(self._incrementCol)
 
-        self.grid_layout_widget = QWidget()
-        self.split_layout.addWidget(self.grid_layout_widget)
-        self.grid_layout = QGridLayout()
-        self.grid_layout.setHorizontalSpacing(1)
-        self.grid_layout.setVerticalSpacing(0)
-        self.grid_layout_widget.setLayout(self.grid_layout)
+        self.editToolBar.addSeparator()
 
-        for i in range(NUM_ROWS):
-            for j in range(NUM_COLS):
-                tile = Tile((i,j))
-                tile.stateChanged.connect(self._tileClicked)
-                self.grid_layout.addWidget(tile,i,j)
+        # self.grid_layout_widget = QWidget()
+        # self.split_layout.addWidget(self.grid_layout_widget)
+        # self.grid_layout = QGridLayout()
+        # self.grid_layout.setHorizontalSpacing(1)
+        # self.grid_layout.setVerticalSpacing(0)
+        # self.grid_layout_widget.setLayout(self.grid_layout)
+
+        # for i in range(NUM_ROWS):
+        #     for j in range(NUM_COLS):
+        #         tile = Tile((i,j))
+        #         tile.stateChanged.connect(self._tileClicked)
+        #         self.grid_layout.addWidget(tile,i,j)
                 
 
     def _createMenuBar(self):
@@ -121,8 +140,12 @@ class MainWindow(QMainWindow):
     def _imageUpdateSlot(self, pic):
         self.feed_label.setPixmap(QPixmap.fromImage(pic))
 
+    def _lastFrameUpdateSlot(self,frame):
+        global last_frame
+        last_frame = frame
+
     def _stopVideoFeed(self):
-        self.thread_worker.stop()
+        self.camera_thread_worker.stop()
 
     def _rowSelectionEnterPressed(self):
         global selected_row
@@ -134,8 +157,9 @@ class MainWindow(QMainWindow):
             else:
                 selected_row = (new_row) % NUM_ROWS
                 self.row_select_field.setText(str(selected_row))
-                self.grid_layout.itemAtPosition(old_row_select,selected_col).widget().setChecked(False)
-                self.grid_layout.itemAtPosition(selected_row,selected_col).widget().setChecked(True)
+                if self.grid_layout is not None:
+                    self.grid_layout.itemAtPosition(old_row_select,selected_col).widget().setChecked(False)
+                    self.grid_layout.itemAtPosition(selected_row,selected_col).widget().setChecked(True)
             # TODO Update corresponding check boxes
         except:
             self.row_select_field.setText(str(old_row_select))
@@ -151,8 +175,9 @@ class MainWindow(QMainWindow):
             else:
                 selected_col = (new_col) % NUM_ROWS
                 self.col_select_field.setText(str(selected_col))
-                self.grid_layout.itemAtPosition(selected_row,old_col_select).widget().setChecked(False)
-                self.grid_layout.itemAtPosition(selected_row,selected_col).widget().setChecked(True)
+                if self.grid_layout is not None:
+                    self.grid_layout.itemAtPosition(selected_row,old_col_select).widget().setChecked(False)
+                    self.grid_layout.itemAtPosition(selected_row,selected_col).widget().setChecked(True)
             
             # TODO Update corresponding check boxes
         except:
@@ -161,13 +186,19 @@ class MainWindow(QMainWindow):
 
     def _incrementRow(self):
         global selected_row
-        selected_row = (selected_row + 1) % NUM_ROWS
+        if selected_row is None:
+            selected_row = 0
+        else:
+            selected_row = (selected_row + 1) % NUM_ROWS
         self.row_select_field.setText(str(selected_row))
         # TODO Update corresponding check boxes
     
     def _incrementCol(self):
         global selected_col
-        selected_col = (selected_col + 1) % NUM_ROWS
+        if selected_col is None:
+            selected_col = 0
+        else:
+            selected_col = (selected_col + 1) % NUM_ROWS
         self.col_select_field.setText(str(selected_col))
         # TODO Update corresponding check boxes
 
@@ -194,22 +225,50 @@ class MainWindow(QMainWindow):
             # TODO: Checks if no other boxes are checked
             print(f"Unchecked {row},{col}")
 
-class ThreadWorker(QThread):
+class CameraThreadWorker(QThread):
     thread_image_update = pyqtSignal(QImage)
+    thread_last_frame_update = pyqtSignal(np.ndarray)
 
     def run(self):
         self.active_thread = True
-        cv2_video_capture = cv2.VideoCapture(0) # Camera ID, in-built webcam is 1
+        cv2_video_capture = cv2.VideoCapture(CAMERA_ID) # Camera ID, in-built webcam is 1
 
         while self.active_thread:
             ret, frame = cv2_video_capture.read()
+            frame = cv2.resize(frame,(VIDEO_W, VIDEO_H))
             if ret:
+                self.thread_last_frame_update.emit(frame)
                 cv2_rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 cv2_flipped_rgb_image = cv2.flip(cv2_rgb_image, 1)
                 image_in_Qt_format = QImage(cv2_flipped_rgb_image.data, cv2_flipped_rgb_image.shape[1], cv2_flipped_rgb_image.shape[0], QImage.Format_RGB888)
-                pic = image_in_Qt_format.scaled(VIDEO_W, VIDEO_H, Qt.KeepAspectRatio)
-                self.thread_image_update.emit(pic)
+                pic = image_in_Qt_format.scaled(VIDEO_W, VIDEO_H)
+                self.thread_image_update.emit(pic)            
     
+    def stop(self):
+        self.active_thread = False
+        self.quit()
+
+
+class PegCheckThreadWorker(QThread):
+    global last_frame
+    def run(self):
+        self.active_thread = True
+
+        while self.active_thread:
+            self.sleep(1)
+            #print("1 secs passed")
+            if last_frame is not None:
+                gray = cv2.cvtColor(last_frame, cv2.COLOR_BGR2GRAY)
+                #print(gray)
+                for i in range(len(rect_array)):
+                    row = rect_array[i]
+                    for j in range(len(row)):
+                        rect = row[j]
+                        tile = tile_array[i][j]
+                        if rect is not None and tile.coords is not None:
+                            tile.has_peg = checkIntensity(gray,tile.coords,INTENSITY_THRESHOLD)   
+                            print(tile.has_peg)   
+
     def stop(self):
         self.active_thread = False
         self.quit()
@@ -228,8 +287,9 @@ class ImageViewApp(QWidget):
 
         self.pix = QPixmap(self.rect().size())
         self.pix.fill(Qt.transparent)
-        self.pen = QPen()
-        self.configPen()
+        self.red_pen = QPen()
+        self.green_pen = QPen()
+        self.configPens()
 
         self.rect_start, self.rect_end = QPoint(), QPoint()
 
@@ -239,10 +299,14 @@ class ImageViewApp(QWidget):
     def setSelectedTile(self,x=0,y=0):
         self.selected_tile = (x,y)
     
-    def configPen(self, color=Qt.red, width=2, join_style=Qt.MiterJoin):
-        self.pen.setColor(color)
-        self.pen.setWidth(width)
-        self.pen.setJoinStyle(join_style)
+    def configPens(self, color1=Qt.red, color2=Qt.green, width=2, join_style=Qt.MiterJoin):
+        self.red_pen.setColor(color1)
+        self.red_pen.setWidth(width)
+        self.red_pen.setJoinStyle(join_style)
+
+        self.green_pen.setColor(color2)
+        self.green_pen.setWidth(width)
+        self.green_pen.setJoinStyle(join_style)
 
     def paintEvent(self, event):
         """
@@ -255,7 +319,7 @@ class ImageViewApp(QWidget):
             rect = QRect(self.rect_start, self.rect_end)
             painter.drawRect(rect.normalized())
         
-        painter.setPen(self.pen)
+        painter.setPen(self.red_pen)
         for i in range(len(rect_array)):
             row = rect_array[i]
             for j in range(len(row)):
@@ -283,6 +347,13 @@ class ImageViewApp(QWidget):
             else:
                 new_rect = QRect(self.rect_start, self.rect_end)
                 rect_array[selected_row][selected_col] = new_rect
+
+            x0 = rect_array[selected_row][selected_col].topLeft().x() if rect_array[selected_row][selected_col].topLeft().x() >= 0 else 0
+            y0 = rect_array[selected_row][selected_col].topLeft().y() if rect_array[selected_row][selected_col].topLeft().y() >= 0 else 0
+            x1 = rect_array[selected_row][selected_col].bottomRight().x() if rect_array[selected_row][selected_col].bottomRight().x() >= 0 else 0
+            y1 = rect_array[selected_row][selected_col].bottomRight().y() if rect_array[selected_row][selected_col].bottomRight().y() >= 0 else 0
+
+            tile_array[selected_row][selected_col].coords = (x0,y0,x1,y1)
 
             self.rect_start, self.rect_end = QPoint(), QPoint()
             self.update()
