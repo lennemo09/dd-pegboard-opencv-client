@@ -366,6 +366,12 @@ class ImageViewApp(QWidget):
 
 
 def get_rectangle_coordinates():
+    """
+    Returns a 2-D bit array of pegs on the grid.
+    Format: For a hole at row i and column j:
+        output_array[i][j] = 0 if peg is not detected.
+        output_array[i][j] = 1 if is is detected.
+    """
     output_array = []
     for row in tile_array:
         output_array.append([1 if tile.has_peg else 0 for tile in row])
