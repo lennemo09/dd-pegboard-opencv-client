@@ -14,7 +14,13 @@ class PegTile():
         self.coords = None
         self.has_peg = False
 
-tile_array = [ [PegTile()]*NUM_COLS for _ in range(NUM_ROWS) ]
+tile_array = []
+for _ in range(NUM_ROWS):
+    new_row = []
+    for _ in range(NUM_COLS):
+        new_tile = PegTile()
+        new_row.append(new_tile)
+    tile_array.append(new_row)
 
 class Tile(QCheckBox):
     def __init__(self, pos):
@@ -106,7 +112,7 @@ class MainWindow(QMainWindow):
         #         tile = Tile((i,j))
         #         tile.stateChanged.connect(self._tileClicked)
         #         self.grid_layout.addWidget(tile,i,j)
-                
+
 
     def _createMenuBar(self):
         menuBar = self.menuBar()
@@ -244,6 +250,7 @@ class PegCheckThreadWorker(QThread):
 
         while self.active_thread:
             self.sleep(1)
+            get_rectangle_coordinates()
             #print("1 secs passed")
             if last_frame is not None:
                 gray = cv2.cvtColor(last_frame, cv2.COLOR_BGR2GRAY)
@@ -254,8 +261,8 @@ class PegCheckThreadWorker(QThread):
                         rect = row[j]
                         tile = tile_array[i][j]
                         if rect is not None and tile.coords is not None:
-                            tile.has_peg = checkIntensity(gray,tile.coords,INTENSITY_THRESHOLD)   
-                            print(tile.has_peg)   
+                            tile.has_peg = checkIntensity(gray,tile.coords,INTENSITY_THRESHOLD)
+                            #print(tile.has_peg)
 
     def stop(self):
         self.active_thread = False
@@ -359,8 +366,10 @@ class ImageViewApp(QWidget):
 
 
 def get_rectangle_coordinates():
-    pass
-
+    output_array = []
+    for row in tile_array:
+        output_array.append([1 if tile.has_peg else 0 for tile in row])
+    return output_array
 
 if __name__ == "__main__":
     qt_app = QApplication(sys.argv)
