@@ -3,6 +3,8 @@ VIDEO_W, VIDEO_H = (800,600)
 NUM_ROWS, NUM_COLS = 22, 41 # Pegboard is 22 x 41
 CAMERA_ID = 0
 INTENSITY_THRESHOLD = 0.3
+PORT = 8080
+
 cv2_video_capture = None
 last_frame = None
 
