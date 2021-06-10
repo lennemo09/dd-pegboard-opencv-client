@@ -8,6 +8,8 @@ Use the Toggle Greyscale and Toggle Mask button to toggle between image format f
 
 ![](img/ui_1.jpg)
 
+The 2-D bit array representing detected pegs on the grid is stored in globals.py `output_bit_array`.
+
 ## How to activate Python environment
 On Windows, in CMD/PowerShell run:
 ``pegboard-env\Scripts\activate``
