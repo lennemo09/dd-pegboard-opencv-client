@@ -75,8 +75,7 @@ class MainWindow(QMainWindow):
         # The thread's signal handler to update the video frames. Check CameraThreadWorker's documentation on how this works.
         self.camera_thread_worker.thread_image_update.connect(self._imageUpdateSlot)    
          # The thread's signal handler to store the previous frame. This is used for sharing frame data between threads for peg detection.
-        self.camera_thread_worker.thread_last_frame_update.connect(self._lastFrameUpdateSlot)  
-        self.camera_thread_worker._setColorFormat()
+        self.camera_thread_worker.thread_last_frame_update.connect(self._lastFrameUpdateSlot) 
 
         # A thread to detect pegs from the current video feed.
         self.peg_check_thread_worker = PegCheckThreadWorker()   
@@ -100,7 +99,7 @@ class MainWindow(QMainWindow):
         self.editToolBar.addWidget(self.row_select_field)
 
         # Increment row button
-        self.next_row_button = QPushButton("Next Row (+1)")
+        self.next_row_button = QPushButton("Next Row(+1)")
         self.editToolBar.addWidget(self.next_row_button)
         self.next_row_button.clicked.connect(self._incrementRow)
 
@@ -119,7 +118,7 @@ class MainWindow(QMainWindow):
         self.editToolBar.addWidget(self.col_select_field)
 
         # Increment column button
-        self.next_col_button = QPushButton("Next Column (+1)")
+        self.next_col_button = QPushButton("Next Column(+1)")
         self.editToolBar.addWidget(self.next_col_button)
         self.next_col_button.clicked.connect(self._incrementCol)
 
@@ -319,12 +318,20 @@ class MainWindow(QMainWindow):
     def _toggleGreyscale(self):
         global using_greyscale
         using_greyscale = not using_greyscale
-        self.camera_thread_worker._setColorFormat()
+        self._setColorFormat()
 
     def _toggleMasking(self):
         global using_mask
         using_mask = not using_mask
-        self.camera_thread_worker._setColorFormat()
+        self._setColorFormat()
+
+    def _setColorFormat(self):
+        if using_greyscale:
+            self.camera_thread_worker.cv_color_format = CV_GRAY_FORMAT
+            self.camera_thread_worker.qimage_format = QImage.Format_Grayscale8
+        else:
+            self.camera_thread_worker.cv_color_format = CV_RGB_FORMAT
+            self.camera_thread_worker.qimage_format = QImage.Format_RGB888
 
 
 class CameraThreadWorker(QThread):
@@ -336,6 +343,13 @@ class CameraThreadWorker(QThread):
 
     # A signal to send the previous OpenCV video frame to global. It is a Numpy array.
     thread_last_frame_update = pyqtSignal(np.ndarray) 
+
+    if using_greyscale:
+        cv_color_format = CV_GRAY_FORMAT
+        qimage_format = QImage.Format_Grayscale8
+    else:
+        cv_color_format = CV_RGB_FORMAT
+        qimage_format = QImage.Format_RGB888
 
     def run(self):
         """
@@ -350,7 +364,6 @@ class CameraThreadWorker(QThread):
                     This is why the video frame is consistently scaled to the globals (VIDEO_W x VIDEO_H).
         """
         self.active_thread = True
-        self._setColorFormat()
         cv2_video_capture = cv2.VideoCapture(CAMERA_ID)
         
         while self.active_thread:
@@ -366,14 +379,6 @@ class CameraThreadWorker(QThread):
                 pic = image_in_Qt_format.scaled(VIDEO_W, VIDEO_H)   # THIS IS IMPORTANT! READ DOCSTRING.
                 self.thread_image_update.emit(pic)            
     
-    def _setColorFormat(self):
-        if using_greyscale:
-            self.cv_color_format = CV_GRAY_FORMAT
-            self.qimage_format = QImage.Format_Grayscale8
-        else:
-            self.cv_color_format = CV_RGB_FORMAT
-            self.qimage_format = QImage.Format_RGB888
-
     def stop(self):
         """
         Kills the thread.
