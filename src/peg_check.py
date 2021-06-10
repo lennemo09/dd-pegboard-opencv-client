@@ -13,7 +13,7 @@ def check_intensity(greyscale_frame,coords):
     """
     greyscale_frame = cv2.resize(greyscale_frame,(VIDEO_W, VIDEO_H))
 
-    if USE_MASKED:
+    if using_mask:
         _, mask2 = cv2.threshold(greyscale_frame, thresh=180, maxval=255, type=cv2.THRESH_BINARY)
         final_image = cv2.bitwise_and(greyscale_frame, mask2)
     else:

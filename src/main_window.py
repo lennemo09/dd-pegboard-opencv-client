@@ -76,6 +76,7 @@ class MainWindow(QMainWindow):
         self.camera_thread_worker.thread_image_update.connect(self._imageUpdateSlot)    
          # The thread's signal handler to store the previous frame. This is used for sharing frame data between threads for peg detection.
         self.camera_thread_worker.thread_last_frame_update.connect(self._lastFrameUpdateSlot)  
+        self.camera_thread_worker._setColorFormat()
 
         # A thread to detect pegs from the current video feed.
         self.peg_check_thread_worker = PegCheckThreadWorker()   
@@ -123,6 +124,16 @@ class MainWindow(QMainWindow):
         self.next_col_button.clicked.connect(self._incrementCol)
 
         self.editToolBar.addSeparator()
+
+        # Toggle greyscale button
+        self.toggle_greyscale_button = QPushButton("Toggle Greyscale")
+        self.editToolBar.addWidget(self.toggle_greyscale_button)
+        self.toggle_greyscale_button.clicked.connect(self._toggleGreyscale)
+
+        # Toggle masking button
+        self.toggle_masking_button = QPushButton("Toggle Masking")
+        self.editToolBar.addWidget(self.toggle_masking_button)
+        self.toggle_masking_button.clicked.connect(self._toggleMasking)
 
         """
         Disabled selection grid. Currently works when you select the current tile via the grid which updates the selection fields
@@ -304,6 +315,16 @@ class MainWindow(QMainWindow):
             # TODO: Checks if no other boxes are checked i.e. there shouldn't be a state when no box is checked.
             # If user unchecks a box, do something like not unchecking or checks box (0,0).
             print(f"Unchecked {row},{col}")
+    
+    def _toggleGreyscale(self):
+        global using_greyscale
+        using_greyscale = not using_greyscale
+        self.camera_thread_worker._setColorFormat()
+
+    def _toggleMasking(self):
+        global using_mask
+        using_mask = not using_mask
+        self.camera_thread_worker._setColorFormat()
 
 
 class CameraThreadWorker(QThread):
@@ -329,27 +350,30 @@ class CameraThreadWorker(QThread):
                     This is why the video frame is consistently scaled to the globals (VIDEO_W x VIDEO_H).
         """
         self.active_thread = True
+        self._setColorFormat()
         cv2_video_capture = cv2.VideoCapture(CAMERA_ID)
-        if USE_GRAYSCALE:
-            cv_color_format = CV_GRAY_FORMAT
-            qimage_format = QImage.Format_Grayscale8
-        else:
-            cv_color_format = CV_RGB_FORMAT
-            qimage_format = QImage.Format_RGB888
-
+        
         while self.active_thread:
             ret, frame = cv2_video_capture.read()
             if ret:
-                display_image = cv2.cvtColor(frame, cv_color_format)
-                if USE_MASKED:
+                display_image = cv2.cvtColor(frame, self.cv_color_format)
+                if using_mask:
                     _, mask2 = cv2.threshold(display_image, thresh=180, maxval=255, type=cv2.THRESH_BINARY)
                     display_image = cv2.bitwise_and(display_image, mask2)
                 flipped_display_image = cv2.flip(display_image, 1)
                 self.thread_last_frame_update.emit(flipped_display_image)
-                image_in_Qt_format = QImage(flipped_display_image.data, flipped_display_image.shape[1], flipped_display_image.shape[0], qimage_format)
+                image_in_Qt_format = QImage(flipped_display_image.data, flipped_display_image.shape[1], flipped_display_image.shape[0], self.qimage_format)
                 pic = image_in_Qt_format.scaled(VIDEO_W, VIDEO_H)   # THIS IS IMPORTANT! READ DOCSTRING.
                 self.thread_image_update.emit(pic)            
     
+    def _setColorFormat(self):
+        if using_greyscale:
+            self.cv_color_format = CV_GRAY_FORMAT
+            self.qimage_format = QImage.Format_Grayscale8
+        else:
+            self.cv_color_format = CV_RGB_FORMAT
+            self.qimage_format = QImage.Format_RGB888
+
     def stop(self):
         """
         Kills the thread.
