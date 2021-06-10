@@ -6,7 +6,7 @@ def send_data(array):
     """
     Send a given array to a socket as a string.
 
-    @param array: 2-D array.
+    @param array: 2-D bit array.
     """
     s = socket.socket()  
     ip = socket.gethostbyname(socket.gethostname())
