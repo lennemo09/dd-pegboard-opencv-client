@@ -320,13 +320,16 @@ class ImageViewApp(QWidget):
             for j in range(len(row)):
                 tile_rect = row[j]
                 if tile_rect is not None:
+                    if output_bit_array[i][j] == 1:
+                        painter.setPen(self.green_pen)
                     painter.drawText(tile_rect.left(), tile_rect.top()-3, f"({i},{j})")
                     painter.drawRect(tile_rect.normalized())
+                    if output_bit_array[i][j] == 1:
+                        painter.setPen(self.red_pen)
         painter.setPen(QPen())
         #print(rect_array)
 
     def mousePressEvent(self, event):
-        #print("Mouse press")
         if event.buttons() & Qt.LeftButton:
             self.rect_start, self.rect_end = QPoint(), QPoint()
             self.rect_start = event.pos()
