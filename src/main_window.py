@@ -330,14 +330,23 @@ class CameraThreadWorker(QThread):
         """
         self.active_thread = True
         cv2_video_capture = cv2.VideoCapture(CAMERA_ID)
+        if USE_GRAYSCALE:
+            cv_color_format = CV_GRAY_FORMAT
+            qimage_format = QImage.Format_Grayscale8
+        else:
+            cv_color_format = CV_RGB_FORMAT
+            qimage_format = QImage.Format_RGB888
 
         while self.active_thread:
             ret, frame = cv2_video_capture.read()
             if ret:
-                self.thread_last_frame_update.emit(frame)
-                cv2_rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                cv2_flipped_rgb_image = cv2.flip(cv2_rgb_image, 1)
-                image_in_Qt_format = QImage(cv2_flipped_rgb_image.data, cv2_flipped_rgb_image.shape[1], cv2_flipped_rgb_image.shape[0], QImage.Format_RGB888)
+                display_image = cv2.cvtColor(frame, cv_color_format)
+                if USE_MASKED:
+                    _, mask2 = cv2.threshold(display_image, thresh=180, maxval=255, type=cv2.THRESH_BINARY)
+                    display_image = cv2.bitwise_and(display_image, mask2)
+                flipped_display_image = cv2.flip(display_image, 1)
+                self.thread_last_frame_update.emit(flipped_display_image)
+                image_in_Qt_format = QImage(flipped_display_image.data, flipped_display_image.shape[1], flipped_display_image.shape[0], qimage_format)
                 pic = image_in_Qt_format.scaled(VIDEO_W, VIDEO_H)   # THIS IS IMPORTANT! READ DOCSTRING.
                 self.thread_image_update.emit(pic)            
     
@@ -373,8 +382,6 @@ class PegCheckThreadWorker(QThread):
             #print("1 secs passed")
 
             if last_frame is not None:
-                gray = cv2.cvtColor(last_frame, cv2.COLOR_BGR2GRAY)
-
                 for i in range(len(rect_array)):
                     row = rect_array[i]
                     for j in range(len(row)):
@@ -383,7 +390,7 @@ class PegCheckThreadWorker(QThread):
 
                         # If a zone/selection rectangle has been defined for this tile/hole of the grid.
                         if rect is not None and tile.coords is not None:
-                            tile.has_peg = check_intensity(gray,tile.coords)
+                            tile.has_peg = check_intensity(last_frame,tile.coords)
                             output_bit_array[i][j] = 1 if tile.has_peg else 0
                 
                 # TO-DO: Call socket function to send the updated output_bit_array to Unity.
