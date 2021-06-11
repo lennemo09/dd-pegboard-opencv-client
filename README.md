@@ -17,3 +17,6 @@ On Windows, in CMD/PowerShell run:
 On UNIX systems run:
 ``source pegboard-env\Scripts\activate``
 
+## How to use TCP Socket
+Add the UnitySocket.cs script to an Unity object and hit play to start the host server.
+Run the PythonSocket.py script to connect to the host and send data over the TCP Connection.
