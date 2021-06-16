@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QPushButton, QWidget, QToolBar, QVBoxLayout, QMenu, QMenuBar, QCheckBox
+from PyQt5.QtWidgets import QApplication, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QPushButton, QWidget, QToolBar, QVBoxLayout, QMenu, QMenuBar, QCheckBox, QSlider
 from PyQt5.QtCore import QThread, Qt, QPoint, QRect, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen, QIntValidator
 import numpy as np
@@ -34,19 +34,19 @@ class MainWindow(QMainWindow):
         self.window = QWidget() # The window's content bounding box is a blank widget where we will add components inside of it.
 
         # A vertical box layout as the main layout.
-        self.layout_main = QVBoxLayout() 
+        self.layout_main = QVBoxLayout()
         self.layout_widget = QWidget()
         self.layout_main.addWidget(self.layout_widget)
 
         # A horizontal box layout to split the first row of the vertical box layout into 2 halfs (intended for a selection grid which is currently disabled).
         self.split_layout = QHBoxLayout()
         self.layout_widget.setLayout(self.split_layout)
-        
+
         # The main content box
-        self.setCentralWidget(self.window)  
+        self.setCentralWidget(self.window)
 
         # The main layout type of the box
-        self.window.setLayout(self.layout_main) 
+        self.window.setLayout(self.layout_main)
 
         # A menu bar which is currently unused
         #menuBar = QMenuBar(self)
@@ -54,33 +54,33 @@ class MainWindow(QMainWindow):
         #self._createMenuBar()
 
         # A toolbar to house the row/column selection fields and columns.
-        self._createToolBars()  
+        self._createToolBars()
 
         # Status bar to display current drawing mouse's coordinates.
-        self._createStatusBar() 
+        self._createStatusBar()
 
         # Video feed component stored in a label
         # IMPORTANT: This IS the video feed's container. It is stored in an empty label for scaling and positioning convenience.
         # If you need to resize or reposition the video feed, do it via this label.
-        self.feed_label = QLabel()  
-        self.feed_label.setScaledContents = True 
+        self.feed_label = QLabel()
+        self.feed_label.setScaledContents = True
         self.split_layout.addWidget(self.feed_label,0)
 
         # Disable stretching of layout's rows so the video feed stays in a fixed position.
-        self.layout_main.addStretch(1)  
+        self.layout_main.addStretch(1)
 
         # A thread to update the video feed using OpenCV's VideoCapture.
-        self.camera_thread_worker = CameraThreadWorker()    
+        self.camera_thread_worker = CameraThreadWorker()
         self.camera_thread_worker.start()
         # The thread's signal handler to update the video frames. Check CameraThreadWorker's documentation on how this works.
-        self.camera_thread_worker.thread_image_update.connect(self._imageUpdateSlot)    
+        self.camera_thread_worker.thread_image_update.connect(self._imageUpdateSlot)
          # The thread's signal handler to store the previous frame. This is used for sharing frame data between threads for peg detection.
-        self.camera_thread_worker.thread_last_frame_update.connect(self._lastFrameUpdateSlot) 
+        self.camera_thread_worker.thread_last_frame_update.connect(self._lastFrameUpdateSlot)
 
         # A thread to detect pegs from the current video feed.
-        self.peg_check_thread_worker = PegCheckThreadWorker()   
+        self.peg_check_thread_worker = PegCheckThreadWorker()
         self.peg_check_thread_worker.start()
-        
+
         # The UI Widget to house the drawing canvas for selection rectangles
         self.selectionCanvasApp = SelectionCanvasApp(self.feed_label)
         self.selectionCanvasApp.setMainWindow(self)
@@ -91,7 +91,7 @@ class MainWindow(QMainWindow):
         self.selected_row_label.setText("Selected row:")
         self.editToolBar.addWidget(self.selected_row_label)
 
-        # The row selection input field 
+        # The row selection input field
         self.row_select_field = QLineEdit(str(selected_row))
         #self.row_select_field.setValidator(QIntValidator(0,NUM_ROWS,self))
         self.row_select_field.setFixedWidth(80) # Set fixed width so it doesn't stretch on window resize.
@@ -134,6 +134,63 @@ class MainWindow(QMainWindow):
         self.editToolBar.addWidget(self.toggle_masking_button)
         self.toggle_masking_button.clicked.connect(self._toggleMasking)
 
+        self.editToolBar.addSeparator()
+
+        # The column selection input field's label
+        self.mask_threshold_label = QLabel()
+        self.mask_threshold_label.setText("Masking threshold:")
+        self.editToolBar.addWidget(self.mask_threshold_label)
+
+        # Masking threshold slider
+        global mask_threshold
+        self.mask_slider = QSlider(Qt.Horizontal)
+        self.mask_slider.setMinimum(0)
+        self.mask_slider.setMaximum(255)
+        self.mask_slider.setValue(mask_threshold)
+        self.mask_slider.setTickPosition(QSlider.TicksBelow)
+        self.mask_slider.setTickInterval(5)
+
+        self.editToolBar.addWidget(self.mask_slider)
+        self.mask_slider.valueChanged.connect(self._maskSliderChange)
+
+        self.editToolBar.addSeparator()
+
+        # The column selection input field's label
+        self.gamma_label = QLabel()
+        self.gamma_label.setText("Gamma:")
+        self.editToolBar.addWidget(self.gamma_label)
+
+        # Gamma slider
+        global gamma
+        self.gamma_slider = QSlider(Qt.Horizontal)
+        self.gamma_slider.setMinimum(1)
+        self.gamma_slider.setMaximum(50)
+        self.gamma_slider.setValue(gamma)
+        self.gamma_slider.setTickPosition(QSlider.TicksBelow)
+        self.gamma_slider.setTickInterval(5)
+
+        self.editToolBar.addWidget(self.gamma_slider)
+        self.gamma_slider.valueChanged.connect(self._gammaSliderChange)
+
+        self.editToolBar.addSeparator()
+
+        # The column selection input field's label
+        self.intensity_threshold_label = QLabel()
+        self.intensity_threshold_label.setText("Intensity threshold:")
+        self.editToolBar.addWidget(self.intensity_threshold_label)
+
+        # Intensity threshold slider
+        global intensity_threshold
+        self.intensity_threshold_slider = QSlider(Qt.Horizontal)
+        self.intensity_threshold_slider.setMinimum(0)
+        self.intensity_threshold_slider.setMaximum(255)
+        self.intensity_threshold_slider.setValue(intensity_threshold)
+        self.intensity_threshold_slider.setTickPosition(QSlider.TicksBelow)
+        self.intensity_threshold_slider.setTickInterval(5)
+
+        self.editToolBar.addWidget(self.intensity_threshold_slider)
+        self.intensity_threshold_slider.valueChanged.connect(self._intensityThresholdliderChange)
+
         """
         Disabled selection grid. Currently works when you select the current tile via the grid which updates the selection fields
         accordingly but doesn't work vice versa (meaning it doesn't update the selection grid if you select a tile using the fields).
@@ -167,7 +224,7 @@ class MainWindow(QMainWindow):
         """
         self.editToolBar = QToolBar("Edit", self)
         self.addToolBar(self.editToolBar)
-    
+
     def _createStatusBar(self):
         """
         Creates the status bar that displays a message using self.statusbar.showMessage()
@@ -179,7 +236,7 @@ class MainWindow(QMainWindow):
         """
         Helper function to display a message to status bar with default display time as 3 secs.
         """
-        self.statusbar = self.statusBar()        
+        self.statusbar = self.statusBar()
         self.statusbar.showMessage(message, time)
 
     def _imageUpdateSlot(self, pic):
@@ -204,7 +261,7 @@ class MainWindow(QMainWindow):
     def _rowSelectionEnterPressed(self):
         """
         Handles what happens when user pressed Enter while entering value in the row selection field.
-        If user inputs a valid row value, updates the current selected_row variable accordingly. 
+        If user inputs a valid row value, updates the current selected_row variable accordingly.
         If a value is larger than maximum, wraps the value by taking the remainder of chosen value with max row size.
         If user inputs a string, do not update selected_row.
         """
@@ -231,7 +288,7 @@ class MainWindow(QMainWindow):
     def _colSelectionEnterPressed(self):
         """
         Handles what happens when user pressed Enter while entering value in the column selection field.
-        If user inputs a valid column value, updates the current selected_col variable accordingly. 
+        If user inputs a valid column value, updates the current selected_col variable accordingly.
         If a value is larger than maximum, wraps the value by taking the remainder of chosen value with max column size.
         If user inputs a string, do not update selected_col.
         """
@@ -249,7 +306,7 @@ class MainWindow(QMainWindow):
                 # The following block tries to update the selection grid accordingly but it's not working.
                 # if self.grid_layout is not None:
                 #     self.grid_layout.itemAtPosition(selected_row,old_col_select).widget().setChecked(False)
-                #     self.grid_layout.itemAtPosition(selected_row,selected_col).widget().setChecked(True)       
+                #     self.grid_layout.itemAtPosition(selected_row,selected_col).widget().setChecked(True)
             # TODO Update corresponding check boxes
         except:
             self.col_select_field.setText(str(old_col_select))
@@ -267,7 +324,7 @@ class MainWindow(QMainWindow):
             selected_row = (selected_row + 1) % NUM_ROWS
         self.row_select_field.setText(str(selected_row))
         # TODO Update corresponding check boxes for selection grid.
-    
+
     def _incrementCol(self):
         """
         Increments the currently selected column by 1.
@@ -296,7 +353,7 @@ class MainWindow(QMainWindow):
         if tile.isChecked():
             self.row_select_field.setText(str(row))
             self.col_select_field.setText(str(col))
-            
+
             global selected_row
             global selected_col
             old_row_select = selected_row
@@ -314,7 +371,7 @@ class MainWindow(QMainWindow):
             # TODO: Checks if no other boxes are checked i.e. there shouldn't be a state when no box is checked.
             # If user unchecks a box, do something like not unchecking or checks box (0,0).
             print(f"Unchecked {row},{col}")
-    
+
     def _toggleGreyscale(self):
         global using_greyscale
         using_greyscale = not using_greyscale
@@ -324,6 +381,23 @@ class MainWindow(QMainWindow):
         global using_mask
         using_mask = not using_mask
         self._setColorFormat()
+
+    def _maskSliderChange(self):
+        global mask_threshold
+        new_thresh = self.mask_slider.value()
+        mask_threshold = new_thresh
+        #print(f"New mask threshold: {mask_threshold}")
+
+    def _gammaSliderChange(self):
+        global gamma
+        new_gamma = self.gamma_slider.value() / 10
+        gamma = new_gamma
+        #print(f"New gamma: {gamma}")
+
+    def _intensityThresholdliderChange(self):
+        global intensity_threshold
+        new_intensity_threshold = self.intensity_threshold_slider.value()
+        intensity_threshold = new_intensity_threshold
 
     def _setColorFormat(self):
         if using_greyscale:
@@ -339,10 +413,10 @@ class CameraThreadWorker(QThread):
     A thread to fetch video frame from OpenCV and update the video feed.
     """
     # A signal to send a QImage which is the new video frame. QImage is because to display in a QPixmap we need a QImage object.
-    thread_image_update = pyqtSignal(QImage) 
+    thread_image_update = pyqtSignal(QImage)
 
     # A signal to send the previous OpenCV video frame to global. It is a Numpy array.
-    thread_last_frame_update = pyqtSignal(np.ndarray) 
+    thread_last_frame_update = pyqtSignal(np.ndarray)
 
     if using_greyscale:
         cv_color_format = CV_GRAY_FORMAT
@@ -365,20 +439,29 @@ class CameraThreadWorker(QThread):
         """
         self.active_thread = True
         cv2_video_capture = cv2.VideoCapture(CAMERA_ID)
-        
+
         while self.active_thread:
             ret, frame = cv2_video_capture.read()
             if ret:
                 display_image = cv2.cvtColor(frame, self.cv_color_format)
                 if using_mask:
-                    _, mask2 = cv2.threshold(display_image, thresh=180, maxval=255, type=cv2.THRESH_BINARY)
+                    _, mask2 = cv2.threshold(display_image, thresh=mask_threshold, maxval=255, type=cv2.THRESH_BINARY)
                     display_image = cv2.bitwise_and(display_image, mask2)
+
+                # Apply gamma
+                invGamma = 1.0 / gamma
+                table = np.array([((i / 255.0) ** invGamma) * 255
+                    for i in np.arange(0, 256)]).astype("uint8")
+
+                # apply gamma correction using the lookup table
+                display_image = cv2.LUT(display_image, table)
+
                 flipped_display_image = cv2.flip(display_image, 1)
                 self.thread_last_frame_update.emit(flipped_display_image)
                 image_in_Qt_format = QImage(flipped_display_image.data, flipped_display_image.shape[1], flipped_display_image.shape[0], self.qimage_format)
                 pic = image_in_Qt_format.scaled(VIDEO_W, VIDEO_H)   # THIS IS IMPORTANT! READ DOCSTRING.
-                self.thread_image_update.emit(pic)            
-    
+                self.thread_image_update.emit(pic)
+
     def stop(self):
         """
         Kills the thread.
@@ -419,9 +502,9 @@ class PegCheckThreadWorker(QThread):
 
                         # If a zone/selection rectangle has been defined for this tile/hole of the grid.
                         if rect is not None and tile.coords is not None:
-                            tile.has_peg = check_intensity(last_frame,tile.coords)
+                            tile.has_peg = check_intensity(last_frame,tile.coords,mask_threshold,intensity_threshold)
                             output_bit_array[i][j] = 1 if tile.has_peg else 0
-                
+
                 # TO-DO: Call socket function to send the updated output_bit_array to Unity.
 
     def stop(self):
@@ -444,7 +527,7 @@ class SelectionCanvasApp(QWidget):
         """
         super(SelectionCanvasApp,self).__init__(parent)
         self.main_window = None
-        
+
         layout = QVBoxLayout()  # Uses a VBoxLayout to be consistent with the video feed so the position/movement of the widget behaves consistently with the Video Feed's label.
         self.setLayout(layout)
 
@@ -464,7 +547,7 @@ class SelectionCanvasApp(QWidget):
         Sets a reference to the main window object.
         """
         self.main_window = main_window
-    
+
     def configPens(self, color1=Qt.red, color2=Qt.green, width=2, join_style=Qt.MiterJoin):
         """
         Configure the rectangles drawing pens.
@@ -497,7 +580,7 @@ class SelectionCanvasApp(QWidget):
         if not self.selection_rect_start.isNull() and not self.selection_rect_end.isNull():
             rect = QRect(self.selection_rect_start, self.selection_rect_end)
             painter.drawRect(rect.normalized())
-        
+
         # For each saved tile/hole on grid
         for i in range(len(rect_array)):
             row = rect_array[i]
@@ -524,7 +607,7 @@ class SelectionCanvasApp(QWidget):
             self.selection_rect_start = event.pos()
             self.selection_rect_end = self.selection_rect_start
             self.update()
-    
+
     def mouseReleaseEvent(self, event):
         """
         Exits DRAWING mode by saving the current rectangle to the global rect_array to be drawn by paintEvent.
@@ -550,7 +633,7 @@ class SelectionCanvasApp(QWidget):
 
             self.selection_rect_start, self.selection_rect_end = QPoint(), QPoint()
             self.update()
-        
+
         else:
             self.selection_rect_start, self.selection_rect_end = QPoint(), QPoint()
             self.update()

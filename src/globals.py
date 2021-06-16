@@ -5,7 +5,6 @@ from cv2 import COLOR_BGR2GRAY, COLOR_BGR2RGB
 VIDEO_W, VIDEO_H = (800,600)
 NUM_ROWS, NUM_COLS = 22, 41 # Pegboard is 22 x 41
 CAMERA_ID = 0
-INTENSITY_THRESHOLD = 1
 PORT = 8080
 
 PEG_CHECK_REFRESH_RATE = 1
@@ -18,6 +17,10 @@ CV_RGB_FORMAT = COLOR_BGR2RGB
 
 cv2_video_capture = None
 last_frame = None
+
+mask_threshold = 180
+gamma = 10
+intensity_threshold = 1
 
 selected_row = None
 selected_col = None
