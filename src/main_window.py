@@ -602,4 +602,6 @@ if __name__ == "__main__":
     try:
         sys.exit(qt_app.exec_())
     except SystemExit:
+        window.camera_thread_worker.stop()
+        window.peg_check_thread_worker.stop()
         print("Closing window.")
