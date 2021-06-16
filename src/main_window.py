@@ -403,7 +403,7 @@ class MainWindow(QMainWindow):
 
     def _gammaSliderChange(self):
         global gamma
-        new_gamma = self.gamma_slider.value() / 10
+        new_gamma = self.gamma_slider.value()
         gamma = new_gamma
         #print(f"New gamma: {gamma}")
 
@@ -461,13 +461,7 @@ class CameraThreadWorker(QThread):
                     _, mask2 = cv2.threshold(display_image, thresh=mask_threshold, maxval=255, type=cv2.THRESH_BINARY)
                     display_image = cv2.bitwise_and(display_image, mask2)
 
-                # Apply gamma
-                invGamma = 1.0 / gamma
-                table = np.array([((i / 255.0) ** invGamma) * 255
-                    for i in np.arange(0, 256)]).astype("uint8")
-
-                # apply gamma correction using the lookup table
-                display_image = cv2.LUT(display_image, table)
+                display_image = apply_gamma(display_image)
 
                 flipped_display_image = cv2.flip(display_image, 1)
                 self.thread_last_frame_update.emit(flipped_display_image)
@@ -661,6 +655,15 @@ class SelectionCanvasApp(QWidget):
             self.update()
 
 
+def apply_gamma(frame):
+    # Apply gamma
+    invGamma = 1.0 / (gamma/10)
+    table = np.array([((i / 255.0) ** invGamma) * 255
+        for i in np.arange(0, 256)]).astype("uint8")
+    # Apply gamma correction using the lookup table
+    return cv2.LUT(frame, table)
+
+
 def get_pegs_bit_array():
     """
     NOTE: This is a helper function for debugging. Outputing the inserted pegs are already handled by PegCheckThreadWorker.run()
@@ -699,6 +702,8 @@ if __name__ == "__main__":
         sys.exit(qt_app.exec_())
     except SystemExit:
         with open('rectangles_data', 'wb') as rectangle_data_file:
+            # This saves the drawn rectangles data to a local file.
+            # This will be loaded on app launch in globals.py
             pickle.dump(rect_array, rectangle_data_file)
             print("Saved rectangles")
         window.camera_thread_worker.stop()

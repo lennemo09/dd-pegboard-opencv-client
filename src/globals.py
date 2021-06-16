@@ -26,6 +26,7 @@ intensity_threshold = 1
 selected_row = None
 selected_col = None
 
+# Try to load saved rectangles data. If it fails, create a clean array.
 try:
     with open('rectangles_data', 'rb') as rectangle_data_file:
         rect_array = pickle.load(rectangle_data_file)
