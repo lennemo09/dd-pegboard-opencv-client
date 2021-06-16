@@ -9,6 +9,7 @@ from globals import *
 from peg_tile import PegTile
 
 import cv2
+import pickle
 
 class Tile(QCheckBox):
     """
@@ -191,6 +192,14 @@ class MainWindow(QMainWindow):
         self.editToolBar.addWidget(self.intensity_threshold_slider)
         self.intensity_threshold_slider.valueChanged.connect(self._intensityThresholdliderChange)
 
+        self.editToolBar.addSeparator()
+
+        # Clear rectangles button
+        self.clear_rects_button = QPushButton("Clear drawn zones")
+        self.editToolBar.addWidget(self.clear_rects_button)
+        self.clear_rects_button.clicked.connect(self._clearRects)
+
+
         """
         Disabled selection grid. Currently works when you select the current tile via the grid which updates the selection fields
         accordingly but doesn't work vice versa (meaning it doesn't update the selection grid if you select a tile using the fields).
@@ -257,6 +266,10 @@ class MainWindow(QMainWindow):
         Calls to kill the video feed thread.
         """
         self.camera_thread_worker.stop()
+
+    def _clearRects(self):
+        global rect_array
+        rect_array = [ [None]*NUM_COLS for _ in range(NUM_ROWS) ]
 
     def _rowSelectionEnterPressed(self):
         """
@@ -685,6 +698,9 @@ if __name__ == "__main__":
     try:
         sys.exit(qt_app.exec_())
     except SystemExit:
+        with open('rectangles_data', 'wb') as rectangle_data_file:
+            pickle.dump(rect_array, rectangle_data_file)
+            print("Saved rectangles")
         window.camera_thread_worker.stop()
         window.peg_check_thread_worker.stop()
         print("Closing window.")

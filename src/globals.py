@@ -1,5 +1,6 @@
 from peg_tile import PegTile
 from cv2 import COLOR_BGR2GRAY, COLOR_BGR2RGB
+import pickle
 
 # GLOBALS
 VIDEO_W, VIDEO_H = (800,600)
@@ -24,7 +25,14 @@ intensity_threshold = 1
 
 selected_row = None
 selected_col = None
-rect_array = [ [None]*NUM_COLS for _ in range(NUM_ROWS) ]
+
+try:
+    with open('rectangles_data', 'rb') as rectangle_data_file:
+        rect_array = pickle.load(rectangle_data_file)
+        print("Loaded rects.")
+except FileNotFoundError:
+    print("No rects data file found.")
+    rect_array = [ [None]*NUM_COLS for _ in range(NUM_ROWS) ]
 
 tile_array = []
 for _ in range(NUM_ROWS):
