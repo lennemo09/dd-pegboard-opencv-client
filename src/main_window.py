@@ -9,6 +9,7 @@ from globals import *
 from peg_tile import PegTile
 
 import cv2
+import socket_util
 import pickle
 
 class Tile(QCheckBox):
@@ -175,7 +176,7 @@ class MainWindow(QMainWindow):
 
         self.editToolBar.addSeparator()
 
-        # The column selection input field's label
+        # Intensity slider's label
         self.intensity_threshold_label = QLabel()
         self.intensity_threshold_label.setText("Intensity threshold:")
         self.editToolBar.addWidget(self.intensity_threshold_label)
@@ -194,10 +195,52 @@ class MainWindow(QMainWindow):
 
         self.editToolBar.addSeparator()
 
+        # Image zoom slider's label
+        self.image_zoom_label = QLabel()
+        self.image_zoom_label.setText("Image zoom:")
+        self.editToolBar.addWidget(self.image_zoom_label)
+
+        # Image zoom slider
+        global scale
+        self.scale_slider = QSlider(Qt.Horizontal)
+        self.scale_slider.setMinimum(1)
+        self.scale_slider.setMaximum(50)
+        self.scale_slider.setValue(scale)
+        self.scale_slider.setTickPosition(QSlider.TicksBelow)
+        self.scale_slider.setTickInterval(5)
+
+        self.editToolBar.addWidget(self.scale_slider)
+        self.scale_slider.valueChanged.connect(self._scaleSliderChange)
+
+        self.editToolBar.addSeparator()
+
+        # Toggle Mirrored button
+        self.toggle_mirrored_button = QPushButton("Toggle mirrored")
+        self.editToolBar.addWidget(self.toggle_mirrored_button)
+        self.toggle_mirrored_button.clicked.connect(self._toggleMirrored)
+
+        self.editToolBar.addSeparator()
+
         # Clear rectangles button
         self.clear_rects_button = QPushButton("Clear drawn zones")
         self.editToolBar.addWidget(self.clear_rects_button)
         self.clear_rects_button.clicked.connect(self._clearRects)
+
+        # Toggle red channel button
+        self.toggle_red = QPushButton("Toggle Red channel")
+        self.editToolBar.addWidget(self.toggle_red)
+        self.toggle_red.clicked.connect(self._toggleRed)
+
+        # Toggle blue channel button
+        self.toggle_blue = QPushButton("Toggle Blue channel")
+        self.editToolBar.addWidget(self.toggle_blue)
+        self.toggle_blue.clicked.connect(self._toggleBlue)
+
+        # Toggle green channel button
+        self.toggle_green = QPushButton("Toggle Green channel")
+        self.editToolBar.addWidget(self.toggle_green)
+        self.toggle_green.clicked.connect(self._toggleGreen)
+
 
 
         """
@@ -232,7 +275,7 @@ class MainWindow(QMainWindow):
         Creates the move-able toolbar that houses buttons and selection fields.
         """
         self.editToolBar = QToolBar("Edit", self)
-        self.addToolBar(self.editToolBar)
+        self.addToolBar(Qt.LeftToolBarArea,self.editToolBar)
 
     def _createStatusBar(self):
         """
@@ -351,6 +394,10 @@ class MainWindow(QMainWindow):
         self.col_select_field.setText(str(selected_col))
         # TODO Update corresponding check boxes for selection grid.
 
+    def _toggleMirrored(self):
+        global mirrored
+        mirrored = not mirrored
+
     def _tileClicked(self):
         """
         UNUSED.
@@ -407,10 +454,28 @@ class MainWindow(QMainWindow):
         gamma = new_gamma
         #print(f"New gamma: {gamma}")
 
+    def _scaleSliderChange(self):
+        global scale
+        new_scale = self.scale_slider.value()
+        scale = new_scale
+        print(scale)
+
     def _intensityThresholdliderChange(self):
         global intensity_threshold
         new_intensity_threshold = self.intensity_threshold_slider.value()
         intensity_threshold = new_intensity_threshold
+
+    def _toggleRed(self):
+        global use_red
+        use_red = not use_red
+
+    def _toggleGreen(self):
+        global use_green
+        use_green = not use_green
+
+    def _toggleBlue(self):
+        global use_blue
+        use_blue = not use_blue
 
     def _setColorFormat(self):
         if using_greyscale:
@@ -455,17 +520,26 @@ class CameraThreadWorker(QThread):
 
         while self.active_thread:
             ret, frame = cv2_video_capture.read()
+            if not use_blue:
+                frame[:,:,0] = 0
+            if not use_green:
+                frame[:,:,1] = 0
+            if not use_red:
+                frame[:,:,2] = 0
             if ret:
                 display_image = cv2.cvtColor(frame, self.cv_color_format)
+                if mirrored:
+                    display_image = cv2.flip(display_image, 1)
                 if using_mask:
                     _, mask2 = cv2.threshold(display_image, thresh=mask_threshold, maxval=255, type=cv2.THRESH_BINARY)
                     display_image = cv2.bitwise_and(display_image, mask2)
 
                 display_image = apply_gamma(display_image)
+                display_image = apply_zoom(display_image)
 
-                flipped_display_image = cv2.flip(display_image, 1)
-                self.thread_last_frame_update.emit(flipped_display_image)
-                image_in_Qt_format = QImage(flipped_display_image.data, flipped_display_image.shape[1], flipped_display_image.shape[0], self.qimage_format)
+                #flipped_display_image = cv2.flip(display_image, 1)
+                self.thread_last_frame_update.emit(display_image)
+                image_in_Qt_format = QImage(display_image.data, display_image.shape[1], display_image.shape[0], self.qimage_format)
                 pic = image_in_Qt_format.scaled(VIDEO_W, VIDEO_H)   # THIS IS IMPORTANT! READ DOCSTRING.
                 self.thread_image_update.emit(pic)
 
@@ -511,6 +585,10 @@ class PegCheckThreadWorker(QThread):
                         if rect is not None and tile.coords is not None:
                             tile.has_peg = check_intensity(last_frame,tile.coords,mask_threshold,intensity_threshold)
                             output_bit_array[i][j] = 1 if tile.has_peg else 0
+                # try:
+                #     socket_util.send_data(output_bit_array)
+                # except TimeoutError:
+                #     pass
 
                 # TO-DO: Call socket function to send the updated output_bit_array to Unity.
 
@@ -664,6 +742,21 @@ def apply_gamma(frame):
     return cv2.LUT(frame, table)
 
 
+def apply_zoom(frame):
+    height, width, channels = frame.shape
+
+    #prepare the crop
+    centerX,centerY=int(height/2),int(width/2)
+    radiusX,radiusY= int(scale*height/100),int(scale*width/100)
+
+    minX,maxX=centerX-radiusX,centerX+radiusX
+    minY,maxY=centerY-radiusY,centerY+radiusY
+
+    cropped = frame[minX:maxX, minY:maxY]
+    resized_cropped = cv2.resize(cropped, (width, height))
+
+    return resized_cropped
+
 def get_pegs_bit_array():
     """
     NOTE: This is a helper function for debugging. Outputing the inserted pegs are already handled by PegCheckThreadWorker.run()
@@ -701,10 +794,16 @@ if __name__ == "__main__":
     try:
         sys.exit(qt_app.exec_())
     except SystemExit:
-        with open('rectangles_data', 'wb') as rectangle_data_file:
+        with open(RECT_DATA_FILE, 'wb') as rectangle_data_file:
             # This saves the drawn rectangles data to a local file.
             # This will be loaded on app launch in globals.py
             pickle.dump(rect_array, rectangle_data_file)
+            print("Saved rectangles")
+
+        with open(TILE_DATA_FILE, 'wb') as tile_data_file:
+            # This saves the drawn rectangles data to a local file.
+            # This will be loaded on app launch in globals.py
+            pickle.dump(tile_array, tile_data_file)
             print("Saved rectangles")
         window.camera_thread_worker.stop()
         window.peg_check_thread_worker.stop()

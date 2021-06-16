@@ -23,7 +23,7 @@ def check_intensity(greyscale_frame,coords,mask_thresh,intensity_thresh):
     intensity = np.mean(selection)
     #print(f"{greyscale_frame.shape},{selection.shape},{coords[1]}:{coords[3]}, {coords[0]}:{coords[2]}",intensity)
     #cv2.imwrite("selection.jpg", selection)
-    print(f"intensity: {intensity} intensity threshold {intensity_thresh} mask threshold {mask_thresh}")
+    #print(f"intensity: {intensity} intensity threshold {intensity_thresh} mask threshold {mask_thresh}")
     if intensity>intensity_thresh:
         return True
     else:
