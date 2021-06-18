@@ -528,11 +528,23 @@ class CameraThreadWorker(QThread):
                 frame[:,:,2] = 0
             if ret:
                 display_image = cv2.cvtColor(frame, self.cv_color_format)
+
                 if mirrored:
                     display_image = cv2.flip(display_image, 1)
+
                 if using_mask:
-                    _, mask2 = cv2.threshold(display_image, thresh=mask_threshold, maxval=255, type=cv2.THRESH_BINARY)
-                    display_image = cv2.bitwise_and(display_image, mask2)
+                    if using_adaptive_thresholding and using_greyscale:
+                        display_image = cv2.medianBlur(display_image,5)
+                        display_image = cv2.adaptiveThreshold(display_image,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,11,2)
+                    else:
+                        _, mask2 = cv2.threshold(display_image, thresh=mask_threshold, maxval=255, type=cv2.THRESH_BINARY)
+                        display_image = cv2.bitwise_and(display_image, mask2)
+
+                # if using_vignette:
+                #     vignette = cv2.imread('vignette.png')
+                #     vignette = cv2.cvtColor(vignette, self.cv_color_format)
+                #     vignette = cv2.resize(vignette,(display_image.shape[1],display_image.shape[0]))
+                #     display_image = cv2.addWeighted(display_image,0.7,vignette,0.5,0)
 
                 display_image = apply_gamma(display_image)
                 display_image = apply_zoom(display_image)
@@ -585,12 +597,11 @@ class PegCheckThreadWorker(QThread):
                         if rect is not None and tile.coords is not None:
                             tile.has_peg = check_intensity(last_frame,tile.coords,mask_threshold,intensity_threshold)
                             output_bit_array[i][j] = 1 if tile.has_peg else 0
-                # try:
-                #     socket_util.send_data(output_bit_array)
-                # except TimeoutError:
-                #     pass
-
-                # TO-DO: Call socket function to send the updated output_bit_array to Unity.
+                try:
+                    socket_util.send_data(output_bit_array)
+                    print("Sent data to socket.")
+                except TimeoutError:
+                    print("Failed to send data to socket. Is the connection opened by Unity?")
 
     def stop(self):
         """
@@ -743,7 +754,10 @@ def apply_gamma(frame):
 
 
 def apply_zoom(frame):
-    height, width, channels = frame.shape
+    try:
+        height, width = frame.shape
+    except Exception:
+        height, width, channels = frame.shape
 
     #prepare the crop
     centerX,centerY=int(height/2),int(width/2)

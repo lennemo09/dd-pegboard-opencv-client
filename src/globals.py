@@ -14,6 +14,8 @@ PEG_CHECK_REFRESH_RATE = 1
 
 using_greyscale = False
 using_mask = False
+using_adaptive_thresholding = False
+using_vignette = True
 
 CV_GRAY_FORMAT = COLOR_BGR2GRAY
 CV_RGB_FORMAT = COLOR_BGR2RGB
